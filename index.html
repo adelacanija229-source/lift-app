@@ -117,21 +117,43 @@ var MC = {"가슴":"#FF7A8A","어깨":"#B06EFF","등":"#00D4B8","이두":"#4DA6F
 
 /* ── 유틸 ─────────────────────────── */
 function fmt(s){var m=Math.floor(s/60),sc=s%60;return(m<10?"0":"")+m+":"+(sc<10?"0":"")+sc;}
+function fmtLong(t){var h=Math.floor(t/3600),m=Math.floor((t%3600)/60);if(h>0)return h+"시간 "+m+"분";if(m>0)return m+"분 "+(t%60)+"초";return t+"초";}
 var SK="lift5";
 var SK_KG="lift5_kg";
 var SK_SES="lift5_ses";
-function saveKg(){
+var SK_EX="lift5_ex";
+/* 무게·세트수·횟수·휴식을 한 번에 저장 */
+function saveEx(){
   try{
     var m={};
     for(var i=0;i<RD.length;i++){
       var r=RD[i];
       for(var j=0;j<r.ex.length;j++){
-        m[r.id+":"+j]=r.ex[j].kg;
+        var e=r.ex[j];
+        m[r.id+":"+j]={k:e.kg,s:e.s,r:e.r,t:e.rest};
       }
     }
-    localStorage.setItem(SK_KG,JSON.stringify(m));
+    localStorage.setItem(SK_EX,JSON.stringify(m));
   }catch(e){}
 }
+function loadEx(){
+  try{
+    var m=JSON.parse(localStorage.getItem(SK_EX)||"null");
+    if(!m)return;
+    for(var i=0;i<RD.length;i++){
+      var r=RD[i];
+      for(var j=0;j<r.ex.length;j++){
+        var v=m[r.id+":"+j];
+        if(!v)continue;
+        if(v.k!==undefined)r.ex[j].kg=v.k;
+        if(v.s)r.ex[j].s=v.s;
+        if(v.r)r.ex[j].r=v.r;
+        if(v.t!==undefined)r.ex[j].rest=v.t;
+      }
+    }
+  }catch(e){}
+}
+/* 구버전 키 마이그레이션용 로더 */
 function loadKg(){
   try{
     var m=JSON.parse(localStorage.getItem(SK_KG)||"null");
@@ -158,6 +180,8 @@ function loadSes(){
   try{
     var sv=JSON.parse(localStorage.getItem(SK_SES)||"null");
     if(!sv)return null;
+    /* 12시간 지난 세션은 폐기 */
+    if(sv.ts&&Date.now()-sv.ts>43200000){localStorage.removeItem(SK_SES);return null;}
     var r=null;for(var i=0;i<RD.length;i++){if(RD[i].id===sv.rid){r=RD[i];break;}}
     if(!r)return null;
     /* 자리 비운 시간만큼 보정 */
@@ -196,6 +220,15 @@ function isThisWeek(d){
 
 /* ── 오디오 ────────────────────────── */
 var _ac=null;
+/* iOS는 사용자 터치 중에 생성/재개된 AudioContext만 소리를 냄 */
+function ensureAudio(){
+  try{
+    if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();
+    if(_ac.state==="suspended")_ac.resume();
+  }catch(e){}
+}
+document.addEventListener("touchstart",ensureAudio,{passive:true});
+document.addEventListener("click",ensureAudio);
 function beep(f,d,g){
   try{
     if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();
@@ -207,6 +240,20 @@ function beep(f,d,g){
     o.start();o.stop(_ac.currentTime+(d||.1));
   }catch(e){}
 }
+
+/* ── 화면 꺼짐 방지 (운동 중) ─────── */
+var _wl=null;
+function reqWL(){
+  try{
+    if(navigator.wakeLock&&!_wl){
+      navigator.wakeLock.request("screen").then(function(w){
+        _wl=w;
+        w.addEventListener("release",function(){_wl=null;});
+      }).catch(function(){});
+    }
+  }catch(e){}
+}
+function relWL(){try{if(_wl){_wl.release();_wl=null;}}catch(e){}}
 
 /* ── 상태 ─────────────────────────── */
 var G={tab:0,view:"home",sel:null,hist:lh(),ct:{},ses:null};
@@ -437,6 +484,7 @@ function pDetail(){
 function startSes(){
   if(G.ses){if(G.ses.ei)clearInterval(G.ses.ei);if(G.ses.ri)clearInterval(G.ses.ri);}
   G.ses={r:G.sel,xi:0,sn:1,done:{},rest:null,ri:null,ei:null,el:0,fin:false};
+  ensureAudio();reqWL();
   document.getElementById("tab").style.display="none";
   G.view="session";draw();
 }
@@ -480,12 +528,7 @@ function pSession(){
   var pct=ts?Math.round(ds/ts*100):0;
   var mc=MC[ex.mu]||"#888";
 
-  if(s.ei)clearInterval(s.ei);
-  s.ei=setInterval(function(){
-    s.el++;
-    var el=document.getElementById("et");
-    if(el)el.textContent=fmt(s.el);
-  },1000);
+  runEl();
 
   var p=document.createElement("div");
   p.style.cssText="min-height:100vh;display:flex;flex-direction:column;background:var(--bg)";
@@ -637,8 +680,18 @@ function pSession(){
 }
 
 /* 타이머 */
+function runEl(){
+  var s=G.ses;if(!s||s.fin)return;
+  if(s.ei)clearInterval(s.ei);
+  s.ei=setInterval(function(){
+    s.el++;
+    var el=document.getElementById("et");
+    if(el)el.textContent=fmt(s.el);
+  },1000);
+}
 function runRest(){
   var s=G.ses;if(s.ri)clearInterval(s.ri);
+  if(!s.rest||s.rest<=0){s.ri=null;return;}
   s.ri=setInterval(function(){
     if(s.rest<=0){clearInterval(s.ri);s.ri=null;updRest(0);beep(900,.18,.5);return;}
     s.rest--;
@@ -669,6 +722,7 @@ function skipRest(){var s=G.ses;if(s.ri){clearInterval(s.ri);s.ri=null;}s.rest=0
 
 function doSet(){
   var s=G.ses;var r=s.r;if(s.rest>0)return;
+  ensureAudio();
   var ex=r.ex[s.xi];
   s.done[s.xi+":"+s.sn]=true;
   if(s.sn<ex.s){
@@ -677,6 +731,7 @@ function doSet(){
     s.xi++;s.sn=1;s.rest=120;saveSes();draw();runRest();
   } else {
     clearInterval(s.ei);if(s.ri)clearInterval(s.ri);s.fin=true;
+    relWL();
     localStorage.removeItem(SK_SES);
     var ts=0;for(var i=0;i<r.ex.length;i++)ts+=r.ex[i].s;
     G.hist.push({rid:r.id,date:new Date().toISOString(),duration:fmt(s.el),totalSets:ts,elapsed:s.el});
@@ -690,8 +745,8 @@ function jump(i){
   var ns=1;
   for(var ss=r.ex[i].s;ss>=1;ss--){if(s.done[i+":"+ss]){ns=(ss<r.ex[i].s?ss+1:ss);break;}}
   s.xi=i;s.sn=ns;
-  s.rest=120;
-  saveSes();draw();runRest();
+  s.rest=0; /* 수동 이동 시 강제 휴식 없음 */
+  saveSes();draw();
 }
 
 function askExit(){
@@ -713,6 +768,7 @@ function doExit(){
   rmModal("exitModal");
   var s=G.ses;if(s){if(s.ei)clearInterval(s.ei);if(s.ri)clearInterval(s.ri);}
   G.ses=null;
+  relWL();
   localStorage.removeItem(SK_SES);
   var tb=document.getElementById("tab");if(tb)tb.style.display="flex";
   G.tab=0;G.view="home";setTab(0);draw();
@@ -727,7 +783,7 @@ function pHistory(){
   var tt=0;for(var i=0;i<G.hist.length;i++)tt+=(G.hist[i].elapsed||0);
   var h="<div style='padding:"+safe+" 20px 20px'>";
   h+="<h1 style='font-size:28px;font-weight:700;letter-spacing:-.3px;margin-bottom:3px'>기록</h1>";
-  h+="<p class='mono' style='font-size:9px;color:var(--t3);margin-bottom:22px'>총 "+total+"회 · 누적 "+fmt(tt)+"</p>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3);margin-bottom:22px'>총 "+total+"회 · 누적 "+fmtLong(tt)+"</p>";
   /* 루틴별 */
   h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:22px'>";
   for(var i=0;i<RD.length;i++){
@@ -804,7 +860,7 @@ function adjKg(d){
   ex.kg=nv;
   var el=document.getElementById("kgCount");
   if(el)el.textContent=nv;
-  saveKg();
+  saveEx();
 }
 
 function adjSets(d){
@@ -835,6 +891,7 @@ function adjSets(d){
   /* 남은 세트 표시 업데이트 */
   var remEl=document.getElementById("remSets");
   if(remEl)remEl.textContent=(nv-s.sn+1)+"세트";
+  saveEx();
 }
 
 function adjReps(d){
@@ -848,6 +905,7 @@ function adjReps(d){
   /* 목표 표시 업데이트 */
   var tgtEl=document.getElementById("tgtReps");
   if(tgtEl)tgtEl.textContent=nv+"회";
+  saveEx();
 }
 
 function adjRest(d){
@@ -865,23 +923,11 @@ function adjRest(d){
       break;
     }
   }
-  saveKg(); /* kg 저장과 동일한 스토리지 패턴으로 rest도 저장 */
-  saveRest();
+  saveEx();
 }
 
 var SK_REST="lift5_rest";
-function saveRest(){
-  try{
-    var m={};
-    for(var i=0;i<RD.length;i++){
-      var r=RD[i];
-      for(var j=0;j<r.ex.length;j++){
-        m[r.id+":"+j]=r.ex[j].rest;
-      }
-    }
-    localStorage.setItem(SK_REST,JSON.stringify(m));
-  }catch(e){}
-}
+/* 구버전 키 마이그레이션용 로더 */
 function loadRest(){
   try{
     var m=JSON.parse(localStorage.getItem(SK_REST)||"null");
@@ -899,12 +945,13 @@ function loadRest(){
 /* ── 전역 핸들러 ─────────────────── */
 function goDetail(i){G.sel=RD[i];G.view="detail";draw();}
 function back(){G.view=(G.tab===0?"home":G.tab===1?"routines":"history");draw();}
-function goHome(){G.ses=null;var tb=document.getElementById("tab");if(tb)tb.style.display="flex";G.tab=0;G.view="home";setTab(0);draw();}
+function goHome(){G.ses=null;relWL();var tb=document.getElementById("tab");if(tb)tb.style.display="flex";G.tab=0;G.view="home";setTab(0);draw();}
 
 /* ── 초기화 ──────────────────────── */
 function initApp(){
   loadKg();
   loadRest();
+  loadEx();
   var saved=loadSes();
   if(saved){
     G.ses=saved;
@@ -913,6 +960,7 @@ function initApp(){
     if(tb)tb.style.display="none";
     draw();
     if(G.ses.rest>0)runRest();
+    reqWL();
   } else {
     setTab(0);draw();
   }
@@ -932,7 +980,13 @@ var _hiddenAt=0;
 document.addEventListener("visibilitychange",function(){
   if(document.hidden){
     _hiddenAt=Date.now();
-    saveSes();saveKg();saveRest();
+    saveSes();saveEx();
+    /* 타이머 정지 — 복귀 시 경과시간을 일괄 보정하므로 백그라운드 틱과 이중계산 방지 */
+    var s=G.ses;
+    if(s&&!s.fin){
+      if(s.ei){clearInterval(s.ei);s.ei=null;}
+      if(s.ri){clearInterval(s.ri);s.ri=null;}
+    }
   } else {
     /* visibilitychange로 돌아온 경우 (페이지 reload 없이) */
     if(G.ses&&!G.ses.fin&&G.view==="session"){
@@ -942,9 +996,11 @@ document.addEventListener("visibilitychange",function(){
         if(G.ses.rest>0)G.ses.rest=Math.max(0,G.ses.rest-away);
         _hiddenAt=0;
       }
-      if(G.ses.rest>0){if(!G.ses.ri)runRest();}
+      if(G.ses.rest>0)runRest();else updRest(0);
+      runEl();
       var et=document.getElementById("et");
       if(et)et.textContent=fmt(G.ses.el);
+      reqWL();
     } else if(!G.ses){
       /* 세션 없을 때 돌아온 경우 — localStorage 재확인 */
       var saved=loadSes();
@@ -954,12 +1010,13 @@ document.addEventListener("visibilitychange",function(){
         if(tb)tb.style.display="none";
         draw();
         if(G.ses.rest>0)runRest();
+        reqWL();
       }
     }
   }
 });
-window.addEventListener("pagehide",function(){saveSes();saveKg();saveRest();});
-window.addEventListener("beforeunload",function(){saveSes();saveKg();saveRest();});
+window.addEventListener("pagehide",function(){saveSes();saveEx();});
+window.addEventListener("beforeunload",function(){saveSes();saveEx();});
 
 /* ── PWA 서비스 워커 등록 ─────────── */
 if("serviceWorker" in navigator){
