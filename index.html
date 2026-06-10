@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="LIFT"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#09090F"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
+<title>LIFT</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Mono&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+:root{--bg:#09090F;--c1:#101018;--c2:#181824;--c3:#22222E;--b1:#2A2A3A;--b2:#3A3A50;--t1:#F0F0FF;--t2:#9898B8;--t3:#505068;--red:#FF3860;--red2:#FF6B88}
+html,body{height:100%;background:var(--bg);overscroll-behavior:none}
+body{font-family:'Inter',sans-serif;color:var(--t1)}
+#app{min-height:100vh;background:var(--bg);padding-bottom:78px}
+.mono{font-family:'Space Mono',monospace}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.up{animation:up .3s ease both}
+::-webkit-scrollbar{width:0}
+/* Tab */
+#tab{position:fixed;bottom:0;left:0;right:0;z-index:99;background:rgba(9,9,15,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--b1);display:flex;padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px))}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:5px 0}
+.tb span{font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.5px;color:var(--t3)}
+/* Btn */
+.bp{display:block;width:100%;padding:16px;background:var(--red);border:none;border-radius:14px;color:#fff;font-family:'Inter',sans-serif;font-size:15px;font-weight:600;letter-spacing:.2px;cursor:pointer;text-align:center}
+.bg{display:block;width:100%;padding:15px;background:transparent;border:1.5px solid var(--b2);border-radius:14px;color:var(--t2);font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;text-align:center}
+/* Card */
+.cd{background:var(--c1);border:1px solid var(--b1);border-radius:18px;overflow:hidden}
+/* Chip */
+.ch{display:inline-flex;align-items:center;font-family:'Space Mono',monospace;font-size:8px;letter-spacing:.5px;padding:3px 8px;border-radius:6px}
+/* Sheet */
+.ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;justify-content:center}
+.sh{background:var(--c2);border:1px solid var(--b1);border-radius:22px 22px 0 0;padding:16px 20px calc(24px + env(safe-area-inset-bottom,0px));width:100%;max-width:500px;animation:sheet .25s ease both}
+</style>
+</head>
+<body>
+<div id="app"><div style="display:flex;align-items:center;justify-content:center;height:100vh"><p style="color:var(--t3)">로딩 중...</p></div></div>
+<div id="tab">
+  <button class="tb" id="tb0" onclick="nav(0)">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span>홈</span>
+  </button>
+  <button class="tb" id="tb1" onclick="nav(1)">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <span>루틴</span>
+  </button>
+  <button class="tb" id="tb2" onclick="nav(2)">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    <span>기록</span>
+  </button>
+</div>
+<script>
+/* ── 데이터 ─────────────────────────── */
+var RD = [
+  {id:"mon",name:"가슴 + 삼두",tag:"UPPER A",ac:"#F5C542",day:"월",en:"MON",dur:90,
+   ms:["가슴","삼두","어깨"],
+   ex:[
+    {nm:"스미스머신 인클라인 벤치프레스",s:4,r:12,rest:40,mu:"가슴",nt:"팔꿈치 45도 유지",kg:40},
+    {nm:"덤벨 플랫 프레스",s:4,r:12,rest:40,mu:"가슴",nt:"완전 가동범위",kg:20,db:1},
+    {nm:"케이블 크로스오버",s:4,r:12,rest:40,mu:"가슴",nt:"안쪽 수축 집중",kg:12},
+    {nm:"케이블 트라이셉스 푸쉬다운",s:4,r:12,rest:40,mu:"삼두",nt:"",kg:15},
+    {nm:"덤벨 사이드 레터럴 레이즈",s:4,r:40,rest:40,mu:"어깨",nt:"",kg:8,db:1}
+   ]},
+  {id:"tue",name:"등 + 이두",tag:"PULL",ac:"#00D4B8",day:"화",en:"TUE",dur:90,
+   ms:["등","이두","어깨"],
+   ex:[
+    {nm:"랫풀다운 와이드그립",s:4,r:12,rest:40,mu:"등",nt:"견갑 먼저 내리기",kg:45},
+    {nm:"케이블 시티드 로우",s:4,r:12,rest:40,mu:"등",nt:"척추 중립 유지",kg:40},
+    {nm:"덤벨 원암 로우",s:4,r:12,rest:40,mu:"등",nt:"팔꿈치 천장으로",kg:24,db:1},
+    {nm:"덤벨 얼터네이팅 컬",s:3,r:12,rest:40,mu:"이두",nt:"왼팔 먼저 시작",kg:12,db:1},
+    {nm:"이지바 컬",s:3,r:12,rest:40,mu:"이두",nt:"반동 없이",kg:20},
+    {nm:"케이블 페이스풀 로프",s:4,r:12,rest:40,mu:"어깨",nt:"",kg:15}
+   ]},
+  {id:"wed",name:"하체",tag:"LOWER",ac:"#B06EFF",day:"수",en:"WED",dur:90,
+   ms:["대퇴","둔근","종아리"],
+   ex:[
+    {nm:"스미스머신 하프 스쿼트",s:4,r:12,rest:40,mu:"대퇴",nt:"무릎 90도 이내",kg:60},
+    {nm:"불가리안 스플릿 스쿼트",s:4,r:12,rest:40,mu:"대퇴",nt:"",kg:14,db:1},
+    {nm:"덤벨 수모 스쿼트",s:4,r:12,rest:40,mu:"내전근",nt:"발끝 45도",kg:24,db:1},
+    {nm:"덤벨 힙 스러스트",s:4,r:15,rest:40,mu:"둔근",nt:"등 소파·벤치에 기대기",kg:24,db:1},
+    {nm:"스미스머신 카프레이즈",s:4,r:12,rest:40,mu:"종아리",nt:"발뒤꿈치 완전히",kg:40}
+   ]},
+  {id:"thu",name:"어깨 ALL-IN",tag:"SHOULDER",ac:"#4DA6FF",day:"목",en:"THU",dur:90,
+   ms:["어깨 전/측/후","코어"],
+   ex:[
+    {nm:"스미스머신 오버헤드프레스",s:4,r:12,rest:40,mu:"어깨",nt:"팔꿈치 앞으로",kg:30},
+    {nm:"덤벨 사이드 레터럴 레이즈",s:4,r:40,rest:40,mu:"어깨",nt:"마지막 드롭셋",kg:8,db:1},
+    {nm:"케이블 사이드 레터럴 레이즈",s:4,r:40,rest:40,mu:"어깨",nt:"",kg:5,sl:1},
+    {nm:"케이블 페이스풀 로프",s:4,r:12,rest:40,mu:"어깨",nt:"",kg:15},
+    {nm:"덤벨 리버스 플라이",s:4,r:12,rest:40,mu:"후면",nt:"상체 45도 숙이기",kg:10,db:1},
+    {nm:"행잉 레그레이즈",s:3,r:15,rest:30,mu:"코어",nt:"반동 없이",kg:0},
+    {nm:"크런치",s:3,r:25,rest:30,mu:"코어",nt:"허리 바닥에 고정",kg:0}
+   ]},
+  {id:"fri",name:"전신 순환",tag:"FULL BODY",ac:"#FF7A55",day:"금",en:"FRI",dur:95,
+   ms:["전신"],
+   ex:[
+    {nm:"케이블 로우",s:4,r:12,rest:40,mu:"등",nt:"80% 중량",kg:35},
+    {nm:"덤벨 플랫 프레스",s:4,r:12,rest:40,mu:"가슴",nt:"",kg:20,db:1},
+    {nm:"덤벨 사이드 레터럴 레이즈",s:4,r:40,rest:40,mu:"어깨",nt:"",kg:8,db:1},
+    {nm:"딥스 체중",s:4,r:0,rest:40,mu:"삼두",nt:"",kg:0,mx:1},
+    {nm:"케이블 페이스풀",s:4,r:12,rest:40,mu:"어깨",nt:"",kg:15},
+    {nm:"덤벨 해머 컬",s:3,r:12,rest:40,mu:"이두",nt:"장두·완근 자극",kg:14,db:1},
+    {nm:"덤벨 얼터네이팅 컬",s:3,r:12,rest:40,mu:"이두",nt:"반동 없이",kg:12,db:1}
+   ]}
+];
+var DM = {1:0,2:1,3:2,4:3,5:4};
+var MC = {"가슴":"#FF7A8A","어깨":"#B06EFF","등":"#00D4B8","이두":"#4DA6FF","삼두":"#F5C542","대퇴":"#00D4B8","내전근":"#4DA6FF","둔근":"#F5C542","종아리":"#FF7A55","코어":"#B06EFF","후면":"#4DA6FF"};
+
+/* ── 유틸 ─────────────────────────── */
+function fmt(s){var m=Math.floor(s/60),sc=s%60;return(m<10?"0":"")+m+":"+(sc<10?"0":"")+sc;}
+var SK="lift5";
+var SK_KG="lift5_kg";
+var SK_SES="lift5_ses";
+function saveKg(){
+  try{
+    var m={};
+    for(var i=0;i<RD.length;i++){
+      var r=RD[i];
+      for(var j=0;j<r.ex.length;j++){
+        m[r.id+":"+j]=r.ex[j].kg;
+      }
+    }
+    localStorage.setItem(SK_KG,JSON.stringify(m));
+  }catch(e){}
+}
+function loadKg(){
+  try{
+    var m=JSON.parse(localStorage.getItem(SK_KG)||"null");
+    if(!m)return;
+    for(var i=0;i<RD.length;i++){
+      var r=RD[i];
+      for(var j=0;j<r.ex.length;j++){
+        var v=m[r.id+":"+j];
+        if(v!==undefined)r.ex[j].kg=v;
+      }
+    }
+  }catch(e){}
+}
+function lh(){try{return JSON.parse(localStorage.getItem(SK)||"[]")}catch(e){return[];}}
+function sh(h){try{localStorage.setItem(SK,JSON.stringify(h));}catch(e){}}
+function saveSes(){
+  if(!G.ses||G.ses.fin){localStorage.removeItem(SK_SES);return;}
+  try{
+    var sv={rid:G.ses.r.id,xi:G.ses.xi,sn:G.ses.sn,done:G.ses.done,rest:G.ses.rest||0,el:G.ses.el,ts:Date.now()};
+    localStorage.setItem(SK_SES,JSON.stringify(sv));
+  }catch(e){}
+}
+function loadSes(){
+  try{
+    var sv=JSON.parse(localStorage.getItem(SK_SES)||"null");
+    if(!sv)return null;
+    var r=null;for(var i=0;i<RD.length;i++){if(RD[i].id===sv.rid){r=RD[i];break;}}
+    if(!r)return null;
+    /* 자리 비운 시간만큼 보정 */
+    var away=sv.ts?Math.floor((Date.now()-sv.ts)/1000):0;
+    var rest=Math.max(0,(sv.rest||0)-away);
+    var el=(sv.el||0)+away;
+    return{r:r,xi:sv.xi,sn:sv.sn,done:sv.done,rest:rest,ri:null,ei:null,el:el,fin:false};
+  }catch(e){return null;}
+}function tot(){var t=0;for(var k in G.ct)t+=G.ct[k];return t;}
+function wkCnt(){
+  var now=new Date(),mon=new Date(now);
+  mon.setDate(now.getDate()-((now.getDay()+6)%7));mon.setHours(0,0,0,0);
+  var c=0;for(var i=0;i<G.hist.length;i++){if(new Date(G.hist[i].date)>=mon)c++;}
+  return c;
+}
+function streak(){
+  if(!G.hist.length)return 0;
+  var seen={};
+  for(var i=0;i<G.hist.length;i++){seen[new Date(G.hist[i].date).toDateString()]=1;}
+  var days=[];for(var d in seen)days.push(new Date(d));
+  days.sort(function(a,b){return b-a;});
+  var st=0,today=new Date();today.setHours(0,0,0,0);
+  for(var i=0;i<days.length;i++){
+    var d=new Date(days[i]);d.setHours(0,0,0,0);
+    var diff=Math.round((today-d)/86400000);
+    if(diff===i||diff===i+1)st++;else break;
+  }
+  return st;
+}
+function ctMap(){var m={};for(var i=0;i<G.hist.length;i++){var r=G.hist[i].rid;m[r]=(m[r]||0)+1;}return m;}
+function isThisWeek(d){
+  var now=new Date(),mon=new Date(now);
+  mon.setDate(now.getDate()-((now.getDay()+6)%7));mon.setHours(0,0,0,0);
+  return d>=mon;
+}
+
+/* ── 오디오 ────────────────────────── */
+var _ac=null;
+function beep(f,d,g){
+  try{
+    if(!_ac)_ac=new(window.AudioContext||window.webkitAudioContext)();
+    var o=_ac.createOscillator(),gn=_ac.createGain();
+    o.connect(gn);gn.connect(_ac.destination);
+    o.frequency.value=f||880;
+    gn.gain.setValueAtTime(g||.3,_ac.currentTime);
+    gn.gain.exponentialRampToValueAtTime(.001,_ac.currentTime+(d||.1));
+    o.start();o.stop(_ac.currentTime+(d||.1));
+  }catch(e){}
+}
+
+/* ── 상태 ─────────────────────────── */
+var G={tab:0,view:"home",sel:null,hist:lh(),ct:{},ses:null};
+G.ct=ctMap();
+
+/* ── 탭 ───────────────────────────── */
+function nav(i){
+  G.tab=i;
+  var views=["home","routines","history"];
+  G.view=views[i];
+  setTab(i);
+  draw();
+}
+function setTab(i){
+  for(var j=0;j<3;j++){
+    var btn=document.getElementById("tb"+j);
+    if(!btn)continue;
+    var svg=btn.querySelector("svg");
+    var sp=btn.querySelector("span");
+    if(j===i){
+      if(svg)svg.setAttribute("stroke","var(--red)");
+      if(sp)sp.style.color="var(--red)";
+    } else {
+      if(svg)svg.setAttribute("stroke","var(--t3)");
+      if(sp)sp.style.color="var(--t3)";
+    }
+  }
+}
+
+/* ── 렌더 ─────────────────────────── */
+function draw(){
+  var app=document.getElementById("app");
+  if(!app)return;
+  app.innerHTML="";
+  app.style.paddingBottom="78px";
+  var el;
+  if(G.view==="home")el=pHome();
+  else if(G.view==="routines")el=pRoutines();
+  else if(G.view==="detail")el=pDetail();
+  else if(G.view==="session")el=pSession();
+  else if(G.view==="history")el=pHistory();
+  else el=pHome();
+  app.appendChild(el);
+}
+
+/* ── 홈 ───────────────────────────── */
+function pHome(){
+  var p=document.createElement("div");
+  p.className="up";
+  var ti=new Date().getDay();
+  var idx=DM[ti];
+  var tr=(idx!==undefined)?RD[idx]:null;
+  var now=new Date();
+  var safe="calc(env(safe-area-inset-top,0px) + 22px)";
+
+  var h="<div style='padding:"+safe+" 20px 20px'>";
+
+  /* 헤더 */
+  h+="<div style='display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:26px'>";
+  h+="<div>";
+  h+="<p class='mono' style='font-size:9px;letter-spacing:1px;color:var(--t3);margin-bottom:5px'>";
+  h+=now.toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"long"});
+  h+="</p>";
+  if(tr){
+    h+="<h1 style='font-size:26px;font-weight:700;line-height:1.2;letter-spacing:-.3px'>";
+    h+="<span style='color:var(--red)'>"+tr.name+"</span><br>";
+    h+="<span style='font-size:16px;font-weight:400;color:var(--t2)'>하는 날이에요</span></h1>";
+  } else {
+    h+="<h1 style='font-size:26px;font-weight:700;line-height:1.2;color:var(--t2)'>오늘은 휴식일이에요</h1>";
+  }
+  h+="</div>";
+  h+="<div style='width:44px;height:44px;background:var(--c2);border:1px solid var(--b1);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0'>🏋️</div>";
+  h+="</div>";
+
+  /* 통계 */
+  var stats=[{v:tot(),l:"총 운동",e:"🔥"},{v:wkCnt(),l:"이번 주",e:"📅"},{v:streak(),l:"연속",e:"⚡"}];
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px'>";
+  for(var i=0;i<stats.length;i++){
+    h+="<div class='cd' style='padding:14px 8px;text-align:center'>";
+    h+="<p style='font-size:18px;margin-bottom:5px'>"+stats[i].e+"</p>";
+    h+="<p style='font-size:24px;font-weight:700;line-height:1'>"+stats[i].v+"</p>";
+    h+="<p class='mono' style='font-size:8px;color:var(--t3);margin-top:4px'>"+stats[i].l+"</p>";
+    h+="</div>";
+  }
+  h+="</div>";
+
+  /* 주간 바 */
+  h+="<div class='cd' style='padding:16px;margin-bottom:18px'>";
+  h+="<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:13px'>";
+  h+="<p style='font-size:13px;font-weight:600;color:var(--t2)'>이번 주</p>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3)'>"+wkCnt()+" / 5</p>";
+  h+="</div>";
+  h+="<div style='display:flex;gap:5px'>";
+  for(var i=0;i<RD.length;i++){
+    var r=RD[i];
+    var done=false;
+    for(var j=0;j<G.hist.length;j++){if(G.hist[j].rid===r.id&&isThisWeek(new Date(G.hist[j].date))){done=true;break;}}
+    var isT=(i===idx);
+    h+="<div style='flex:1;text-align:center'>";
+    h+="<div style='height:4px;border-radius:2px;margin-bottom:6px;background:"+(done?r.ac:(isT?"rgba(255,56,96,.3)":"var(--c3)"))+"'></div>";
+    h+="<p class='mono' style='font-size:9px;color:"+(done?r.ac:(isT?"var(--red)":"var(--t3)"))+"'>"+r.day+"</p>";
+    h+="</div>";
+  }
+  h+="</div></div>";
+
+  /* 오늘 루틴 카드 */
+  if(tr){
+    h+="<div onclick='goDetail("+idx+")' style='background:linear-gradient(140deg,"+tr.ac+"14,transparent 60%);border:1px solid "+tr.ac+"30;border-radius:20px;padding:20px;margin-bottom:16px;cursor:pointer;position:relative;overflow:hidden'>";
+    h+="<div style='position:absolute;top:-24px;right:-24px;width:110px;height:110px;background:"+tr.ac+"08;border-radius:50%;pointer-events:none'></div>";
+    h+="<div style='display:flex;align-items:center;justify-content:space-between'>";
+    h+="<div style='flex:1;padding-right:12px'>";
+    h+="<span class='ch' style='background:"+tr.ac+"18;color:"+tr.ac+";border:1px solid "+tr.ac+"30;margin-bottom:10px'>"+tr.tag+"</span>";
+    h+="<h2 style='font-size:24px;font-weight:700;letter-spacing:-.3px;margin-bottom:5px'>"+tr.name+"</h2>";
+    h+="<p style='font-size:12px;color:var(--t2)'>"+tr.ex.length+"종목 · "+tr.dur+"분</p>";
+    h+="</div>";
+    h+="<div style='width:48px;height:48px;background:"+tr.ac+";border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 6px 20px "+tr.ac+"44'>";
+    h+="<svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='#000' stroke-width='2.5' stroke-linecap='round'><polygon points='5 3 19 12 5 21 5 3'/></svg>";
+    h+="</div></div></div>";
+  }
+
+  /* 다른 루틴 */
+  h+="<p class='mono' style='font-size:9px;letter-spacing:1px;color:var(--t3);margin-bottom:11px'>OTHER ROUTINES</p>";
+  for(var i=0;i<RD.length;i++){
+    if(i===idx)continue;
+    var r=RD[i];var ct=G.ct[r.id]||0;
+    h+="<div onclick='goDetail("+i+")' class='cd' style='padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px'>";
+    h+="<div style='width:38px;height:38px;background:"+r.ac+"14;border:1px solid "+r.ac+"22;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0'>";
+    h+="<p style='font-size:16px;font-weight:700;color:"+r.ac+"'>"+r.day+"</p></div>";
+    h+="<div style='flex:1'>";
+    h+="<p style='font-size:15px;font-weight:600;margin-bottom:1px'>"+r.name+"</p>";
+    h+="<p class='mono' style='font-size:9px;color:var(--t3)'>"+r.ex.length+"종목 · "+r.dur+"분</p>";
+    h+="</div>";
+    if(ct>0){h+="<span class='ch' style='background:var(--c3);color:var(--t2);border:1px solid var(--b1)'>"+ct+"회</span>";}
+    else{h+="<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='var(--t3)' stroke-width='2'><polyline points='9 18 15 12 9 6'/></svg>";}
+    h+="</div>";
+  }
+  h+="</div>";
+  p.innerHTML=h;return p;
+}
+
+/* ── 루틴 목록 ────────────────────── */
+function pRoutines(){
+  var p=document.createElement("div");p.className="up";
+  var safe="calc(env(safe-area-inset-top,0px) + 22px)";
+  var h="<div style='padding:"+safe+" 20px 20px'>";
+  h+="<h1 style='font-size:28px;font-weight:700;letter-spacing:-.3px;margin-bottom:4px'>루틴</h1>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3);margin-bottom:22px;letter-spacing:.5px'>MON - FRI</p>";
+  for(var i=0;i<RD.length;i++){
+    var r=RD[i];var ct=G.ct[r.id]||0;var pct=ct>0?Math.min(ct*20,100):0;
+    h+="<div onclick='goDetail("+i+")' class='cd' style='margin-bottom:12px;cursor:pointer'>";
+    h+="<div style='height:2px;background:linear-gradient(90deg,"+r.ac+","+r.ac+"22)'></div>";
+    h+="<div style='padding:18px'>";
+    h+="<div style='display:flex;align-items:center;gap:13px;margin-bottom:13px'>";
+    h+="<div style='width:48px;height:48px;background:"+r.ac+"12;border:1px solid "+r.ac+"20;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0'>";
+    h+="<p style='font-size:17px;font-weight:700;color:"+r.ac+";line-height:1'>"+r.day+"</p>";
+    h+="<p class='mono' style='font-size:7px;color:"+r.ac+"77;letter-spacing:.5px'>"+r.en+"</p></div>";
+    h+="<div style='flex:1'>";
+    h+="<p style='font-size:17px;font-weight:700;letter-spacing:-.2px;margin-bottom:2px'>"+r.name+"</p>";
+    h+="<p class='mono' style='font-size:9px;color:var(--t3)'>"+r.ex.length+"종목 · "+r.dur+"분</p></div>";
+    h+="<div style='text-align:right'>";
+    h+="<p style='font-size:22px;font-weight:700;line-height:1;color:"+(ct>0?r.ac:"var(--t3)")+"'>"+ct+"</p>";
+    h+="<p class='mono' style='font-size:8px;color:var(--t3)'>완료</p></div></div>";
+    h+="<div style='height:3px;background:var(--c3);border-radius:2px;margin-bottom:11px'>";
+    h+="<div style='height:100%;width:"+pct+"%;background:"+r.ac+";border-radius:2px'></div></div>";
+    h+="<div style='display:flex;flex-wrap:wrap;gap:5px'>";
+    var lim=Math.min(r.ex.length,4);
+    for(var j=0;j<lim;j++){
+      var mc=MC[r.ex[j].mu]||"#888";
+      var nm=r.ex[j].nm.split(" ");nm=nm.slice(0,2).join(" ");
+      h+="<span class='ch' style='background:"+mc+"10;color:"+mc+"88;border:1px solid "+mc+"20'>"+nm+"</span>";
+    }
+    if(r.ex.length>4){h+="<span class='ch' style='background:var(--c3);color:var(--t3);border:1px solid var(--b1)'>+"+( r.ex.length-4)+"</span>";}
+    h+="</div></div></div>";
+  }
+  h+="</div>";
+  p.innerHTML=h;return p;
+}
+
+/* ── 상세 ─────────────────────────── */
+function pDetail(){
+  var r=G.sel;if(!r){G.view="home";return pHome();}
+  var ct=G.ct[r.id]||0;
+  var p=document.createElement("div");p.className="up";
+  var safe="calc(env(safe-area-inset-top,0px) + 16px)";
+  var h="";
+  h+="<div style='padding:"+safe+" 20px 20px;background:linear-gradient(160deg,"+r.ac+"12,transparent 55%);border-bottom:1px solid var(--b1)'>";
+  h+="<button onclick='back()' style='background:var(--c2);border:1px solid var(--b1);border-radius:11px;color:var(--t2);padding:8px 13px;cursor:pointer;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:5px;margin-bottom:20px'>";
+  h+="<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><polyline points='15 18 9 12 15 6'/></svg>뒤로</button>";
+  h+="<span class='ch' style='background:"+r.ac+"18;color:"+r.ac+";border:1px solid "+r.ac+"30;margin-bottom:11px;display:inline-flex'>"+r.tag+"</span>";
+  h+="<h1 style='font-size:34px;font-weight:700;letter-spacing:-.4px;line-height:1.1;margin-bottom:7px'>"+r.name+"</h1>";
+  h+="<p style='font-size:13px;color:var(--t2);margin-bottom:16px'>"+r.day+"요일 · "+r.dur+"분 · "+r.ms.join(", ")+"</p>";
+  h+="<div style='display:flex;gap:8px'>";
+  var ds=[{l:"종목",v:r.ex.length},{l:"총 세트",v:(function(){var t=0;for(var i=0;i<r.ex.length;i++)t+=r.ex[i].s;return t;})()},{l:"완료",v:ct}];
+  for(var i=0;i<ds.length;i++){
+    h+="<div style='flex:1;background:rgba(255,255,255,.04);border:1px solid var(--b1);border-radius:11px;padding:10px;text-align:center'>";
+    h+="<p style='font-size:20px;font-weight:700;color:"+r.ac+";line-height:1;margin-bottom:3px'>"+ds[i].v+"</p>";
+    h+="<p class='mono' style='font-size:8px;color:var(--t3)'>"+ds[i].l+"</p></div>";
+  }
+  h+="</div></div>";
+  h+="<div style='padding:18px 20px'>";
+  h+="<p class='mono' style='font-size:9px;letter-spacing:1px;color:var(--t3);margin-bottom:13px'>EXERCISES</p>";
+  for(var i=0;i<r.ex.length;i++){
+    var e=r.ex[i];var mc=MC[e.mu]||"#888";
+    h+="<div style='display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--b1)'>";
+    h+="<div style='width:32px;height:32px;background:"+mc+"14;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px'>";
+    h+="<p style='font-size:12px;font-weight:700;color:"+mc+"'>"+(i+1)+"</p></div>";
+    h+="<div style='flex:1'>";
+    h+="<p style='font-size:14px;font-weight:500;margin-bottom:5px'>"+e.nm+"</p>";
+    h+="<div style='display:flex;gap:5px;flex-wrap:wrap'>";
+    h+="<span class='ch' style='background:var(--c2);color:var(--t2);border:1px solid var(--b1)'>"+e.s+"세트 × "+(e.mx?"최대":e.r+"회")+"</span>";
+    h+="<span class='ch' style='background:rgba(255,56,96,.08);color:var(--red2);border:1px solid rgba(255,56,96,.18)'>휴식 "+e.rest+"s</span>";
+    if(e.kg>0){h+="<span class='ch' style='background:rgba(255,255,255,.05);color:var(--t2);border:1px solid var(--b1)'>"+e.kg+"kg</span>";}
+    else if(e.kg===0&&!e.mx){h+="<span class='ch' style='background:rgba(255,255,255,.05);color:var(--t2);border:1px solid var(--b1)'>BW</span>";}
+    if(e.nt){h+="<span class='ch' style='background:var(--c2);color:var(--t3);border:1px solid var(--b1)'>"+e.nt+"</span>";}
+    h+="</div></div>";
+    h+="<span class='ch' style='background:"+mc+"10;color:"+mc+";border:1px solid "+mc+"20;align-self:flex-start;margin-top:2px;flex-shrink:0'>"+e.mu+"</span>";
+    h+="</div>";
+  }
+  h+="</div>";
+  h+="<div style='padding:6px 20px 36px;display:flex;flex-direction:column;gap:10px'>";
+  h+="<button class='bp' onclick='startSes()'>▶  운동 시작</button>";
+  h+="<button class='bg' onclick='back()'>뒤로 가기</button>";
+  h+="</div>";
+  p.innerHTML=h;return p;
+}
+
+/* ── 세션 ─────────────────────────── */
+function startSes(){
+  if(G.ses){if(G.ses.ei)clearInterval(G.ses.ei);if(G.ses.ri)clearInterval(G.ses.ri);}
+  G.ses={r:G.sel,xi:0,sn:1,done:{},rest:null,ri:null,ei:null,el:0,fin:false};
+  document.getElementById("tab").style.display="none";
+  G.view="session";draw();
+}
+
+function pSession(){
+  var s=G.ses;var r=s.r;
+  if(!r){G.view="home";return pHome();}
+
+  /* 완료 화면 */
+  if(s.fin){
+    clearInterval(s.ei);
+    document.getElementById("tab").style.display="flex";
+    var ts=0;for(var i=0;i<r.ex.length;i++)ts+=r.ex[i].s;
+    var p=document.createElement("div");
+    p.style.cssText="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center";
+    p.style.background="radial-gradient(ellipse 70% 50% at 50% 40%,"+r.ac+"10,var(--bg))";
+    var h="";
+    h+="<div style='width:72px;height:72px;background:"+r.ac+";border-radius:20px;display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 8px 32px "+r.ac+"44'>";
+    h+="<svg width='36' height='36' viewBox='0 0 24 24' fill='none' stroke='#000' stroke-width='2.5' stroke-linecap='round'><polyline points='20 6 9 17 4 12'/></svg></div>";
+    h+="<p class='mono' style='font-size:9px;letter-spacing:2px;color:"+r.ac+";margin-bottom:10px'>COMPLETED</p>";
+    h+="<h1 style='font-size:46px;font-weight:700;letter-spacing:-.5px;line-height:1;margin-bottom:6px'>완료!</h1>";
+    h+="<p style='font-size:15px;color:var(--t2);margin-bottom:26px'>"+r.name+"</p>";
+    h+="<div class='cd' style='padding:20px 28px;margin-bottom:26px;width:100%;max-width:300px'>";
+    h+="<p class='mono' style='font-size:8px;letter-spacing:2px;color:var(--t3);margin-bottom:7px'>TOTAL TIME</p>";
+    h+="<p style='font-size:46px;font-weight:700;color:"+r.ac+";line-height:1;letter-spacing:-.5px'>"+fmt(s.el)+"</p>";
+    h+="<div style='display:flex;justify-content:center;gap:22px;margin-top:14px;padding-top:14px;border-top:1px solid var(--b1)'>";
+    h+="<div><p style='font-size:20px;font-weight:700;line-height:1;margin-bottom:3px'>"+ts+"</p><p class='mono' style='font-size:8px;color:var(--t3)'>세트</p></div>";
+    h+="<div style='width:1px;background:var(--b1)'></div>";
+    h+="<div><p style='font-size:20px;font-weight:700;line-height:1;margin-bottom:3px'>"+r.ex.length+"</p><p class='mono' style='font-size:8px;color:var(--t3)'>종목</p></div>";
+    h+="<div style='width:1px;background:var(--b1)'></div>";
+    h+="<div><p style='font-size:20px;font-weight:700;line-height:1;margin-bottom:3px'>"+(G.ct[r.id]||1)+"</p><p class='mono' style='font-size:8px;color:var(--t3)'>총 완료</p></div>";
+    h+="</div></div>";
+    h+="<button class='bp' onclick='goHome()' style='max-width:300px;width:100%'>홈으로 돌아가기</button>";
+    p.innerHTML=h;return p;
+  }
+
+  /* 진행 화면 */
+  var ex=r.ex[s.xi];
+  var ts=0;for(var i=0;i<r.ex.length;i++)ts+=r.ex[i].s;
+  var ds=0;for(var k in s.done)ds++;
+  var pct=ts?Math.round(ds/ts*100):0;
+  var mc=MC[ex.mu]||"#888";
+
+  if(s.ei)clearInterval(s.ei);
+  s.ei=setInterval(function(){
+    s.el++;
+    var el=document.getElementById("et");
+    if(el)el.textContent=fmt(s.el);
+  },1000);
+
+  var p=document.createElement("div");
+  p.style.cssText="min-height:100vh;display:flex;flex-direction:column;background:var(--bg)";
+  var h="";
+
+  /* 탑바 */
+  h+="<div style='padding:calc(env(safe-area-inset-top,0px)+12px) 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:10;background:rgba(9,9,15,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)'>";
+  h+="<button onclick='askExit()' style='background:var(--c2);border:1px solid var(--b1);border-radius:11px;color:var(--t2);padding:8px 12px;cursor:pointer;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:5px'>";
+  h+="<svg width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>종료</button>";
+  h+="<div style='text-align:center'>";
+  h+="<p style='font-size:13px;font-weight:600;color:var(--t1)'>"+r.name+"</p>";
+  h+="<div style='display:flex;align-items:center;gap:4px;justify-content:center;margin-top:2px'>";
+  h+="<div style='width:5px;height:5px;border-radius:50%;background:var(--red);animation:blink 1.5s infinite'></div>";
+  h+="<p class='mono' style='font-size:8px;color:var(--red);letter-spacing:1px'>LIVE</p></div></div>";
+  h+="<div style='background:"+r.ac+"14;border:1.5px solid "+r.ac+"28;border-radius:11px;padding:6px 12px;text-align:right'>";
+  h+="<p class='mono' style='font-size:7px;color:"+r.ac+";opacity:.65;letter-spacing:2px;line-height:1;margin-bottom:2px'>TIME</p>";
+  h+="<p id='et' style='font-size:20px;font-weight:700;color:"+r.ac+";line-height:1;letter-spacing:-.3px'>"+fmt(s.el)+"</p></div></div>";
+
+  /* 진행바 */
+  h+="<div style='padding:10px 16px 0'>";
+  h+="<div style='display:flex;justify-content:space-between;margin-bottom:5px'>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3)'>전체 진행</p>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3)'>"+ds+"/"+ts+" · "+pct+"%</p></div>";
+  h+="<div style='height:3px;background:var(--c3);border-radius:2px'>";
+  h+="<div style='height:100%;width:"+pct+"%;background:linear-gradient(90deg,"+r.ac+","+r.ac+"66);border-radius:2px;transition:width .4s ease'></div></div></div>";
+
+  h+="<div style='flex:1;overflow-y:auto;padding:12px 16px'>";
+
+  /* REST 배너 */
+  var rv=s.rest||0;
+  h+="<div id='rb' style='display:"+(rv>0?"flex":"none")+";background:rgba(255,56,96,.08);border:1.5px solid rgba(255,56,96,.2);border-radius:16px;padding:14px 16px;margin-bottom:12px;align-items:center;justify-content:space-between'>";
+  h+="<div style='display:flex;align-items:center;gap:13px'>";
+  h+="<div style='width:42px;height:42px;background:rgba(255,56,96,.12);border:1.5px solid rgba(255,56,96,.3);border-radius:12px;display:flex;align-items:center;justify-content:center'>";
+  h+="<span style='font-size:20px;display:inline-block;animation:spin 2s linear infinite'>↺</span></div>";
+  h+="<div><p id='rl' class='mono' style='font-size:9px;letter-spacing:1.5px;color:var(--red2);margin-bottom:2px'>REST</p>";
+  h+="<p id='rv' style='font-size:38px;font-weight:700;color:var(--red);line-height:1;letter-spacing:-.5px'>"+fmt(rv)+"</p></div></div>";
+  h+="<button onclick='skipRest()' style='background:rgba(255,56,96,.12);border:1.5px solid rgba(255,56,96,.28);border-radius:11px;color:var(--red2);font-size:13px;font-weight:600;padding:10px 15px;cursor:pointer'>SKIP</button></div>";
+
+  /* 운동 카드 */
+  h+="<div class='cd' style='padding:18px;margin-bottom:12px;border-top:2px solid "+r.ac+"'>";
+  h+="<div style='display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px'>";
+  h+="<div style='flex:1;padding-right:12px'>";
+  h+="<div style='display:flex;align-items:center;gap:7px;margin-bottom:8px'>";
+  h+="<span class='ch' style='background:"+mc+"12;color:"+mc+";border:1px solid "+mc+"22'>"+ex.mu+"</span>";
+  h+="<span class='mono' style='font-size:9px;color:var(--t3)'>"+(s.xi+1)+"/"+r.ex.length+"</span></div>";
+  h+="<h2 style='font-size:22px;font-weight:700;letter-spacing:-.3px;line-height:1.2'>"+ex.nm+"</h2>";
+  if(ex.nt){h+="<p style='font-size:11px;color:var(--t3);margin-top:5px'>💡 "+ex.nt+"</p>";}
+  h+="</div>";
+  h+="<div style='text-align:center;flex-shrink:0;background:"+r.ac+"12;border:1.5px solid "+r.ac+"26;border-radius:13px;padding:9px 13px'>";
+  h+="<p class='mono' style='font-size:7px;color:"+r.ac+";opacity:.6;letter-spacing:1px;margin-bottom:3px'>SET</p>";
+  h+="<p style='font-size:28px;font-weight:700;color:"+r.ac+";line-height:1;letter-spacing:-.5px'>"+s.sn+"<span style='font-size:14px;opacity:.4'>/"+ex.s+"</span></p></div></div>";
+
+  /* 세트수 · 횟수 · 무게 조절 */
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px'>";
+  /* 세트수 */
+  h+="<div style='background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:12px;padding:10px 8px'>";
+  h+="<p class='mono' style='font-size:7px;color:var(--t3);margin-bottom:6px;letter-spacing:.5px;text-align:center'>세트수</p>";
+  h+="<div style='display:flex;align-items:center;justify-content:space-between'>";
+  h+="<button onclick='adjSets(-1)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>−</button>";
+  h+="<p id='setCount' style='font-size:20px;font-weight:700;color:"+r.ac+"'>"+ex.s+"</p>";
+  h+="<button onclick='adjSets(1)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>+</button>";
+  h+="</div></div>";
+  /* 횟수 */
+  h+="<div style='background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:12px;padding:10px 8px'>";
+  h+="<p class='mono' style='font-size:7px;color:var(--t3);margin-bottom:6px;letter-spacing:.5px;text-align:center'>횟수</p>";
+  h+="<div style='display:flex;align-items:center;justify-content:space-between'>";
+  h+="<button onclick='adjReps(-1)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>−</button>";
+  h+="<p id='repCount' style='font-size:20px;font-weight:700;color:"+r.ac+"'>"+(ex.mx?"∞":ex.r)+"</p>";
+  h+="<button onclick='adjReps(1)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>+</button>";
+  h+="</div></div>";
+  /* 무게 */
+  h+="<div style='background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:12px;padding:10px 8px'>";
+  h+="<p class='mono' style='font-size:7px;color:var(--t3);margin-bottom:6px;letter-spacing:.5px;text-align:center'>"+(ex.kg===0?"바디웨이트":"무게(kg)")+"</p>";
+  h+="<div style='display:flex;align-items:center;justify-content:space-between'>";
+  if(ex.kg===0){
+    h+="<p style='font-size:13px;font-weight:600;color:var(--t2);text-align:center;width:100%'>BW</p>";
+  } else {
+    h+="<button onclick='adjKg(-"+(ex.db?2:(ex.sl?2.5:5))+")' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>−</button>";
+    h+="<p id='kgCount' style='font-size:20px;font-weight:700;color:"+r.ac+"'>"+ex.kg+"</p>";
+    h+="<button onclick='adjKg("+(ex.db?2:(ex.sl?2.5:5))+")' style='width:28px;height:28px;border-radius:8px;border:1.5px solid var(--b2);background:var(--c3);color:var(--t1);font-size:18px;cursor:pointer;line-height:1'>+</button>";
+  }
+  h+="</div></div>";
+  h+="</div>";
+
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px'>";
+  /* 목표 */
+  h+="<div style='background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:10px;padding:9px;text-align:center'>";
+  h+="<p class='mono' style='font-size:7px;color:var(--t3);margin-bottom:4px'>목표</p>";
+  h+="<p id='tgtReps' style='font-size:15px;font-weight:600'>"+(ex.mx?"최대":ex.r+"회")+"</p></div>";
+  /* 남은 세트 */
+  h+="<div style='background:rgba(255,255,255,.03);border:1px solid var(--b1);border-radius:10px;padding:9px;text-align:center'>";
+  h+="<p class='mono' style='font-size:7px;color:var(--t3);margin-bottom:4px'>남은</p>";
+  h+="<p id='remSets' style='font-size:15px;font-weight:600'>"+(ex.s-s.sn+1)+"세트</p></div>";
+  h+="</div>";
+  /* 휴식 조절 (별도 행) */
+  h+="<div style='background:rgba(255,56,96,.05);border:1px solid rgba(255,56,96,.15);border-radius:12px;padding:10px 8px;margin-top:8px'>";
+  h+="<p class='mono' style='font-size:7px;color:rgba(255,107,136,.7);margin-bottom:6px;letter-spacing:.5px;text-align:center'>휴식 시간</p>";
+  h+="<div style='display:flex;align-items:center;justify-content:space-between'>";
+  h+="<button onclick='adjRest(-10)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid rgba(255,56,96,.25);background:rgba(255,56,96,.1);color:var(--red2);font-size:14px;font-weight:700;cursor:pointer;line-height:1'>−10</button>";
+  h+="<div style='text-align:center'>";
+  h+="<p id='restCount' style='font-size:22px;font-weight:700;color:var(--red);line-height:1'>"+ex.rest+"</p>";
+  h+="<p class='mono' style='font-size:8px;color:var(--red2);opacity:.6;letter-spacing:.5px'>초</p>";
+  h+="</div>";
+  h+="<button onclick='adjRest(10)' style='width:28px;height:28px;border-radius:8px;border:1.5px solid rgba(255,56,96,.25);background:rgba(255,56,96,.1);color:var(--red2);font-size:14px;font-weight:700;cursor:pointer;line-height:1'>+10</button>";
+  h+="</div></div>";
+  h+="</div>";
+
+  /* 세트 도트 */
+  h+="<div id='dotWrap' style='display:flex;gap:6px;margin-bottom:12px;justify-content:center'>";
+  for(var i=0;i<ex.s;i++){
+    var sd=s.done[s.xi+":"+(i+1)];var act=(i+1===s.sn);
+    h+="<div style='flex:1;max-width:54px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;";
+    h+="background:"+(sd?r.ac:(act?r.ac+"1a":"var(--c2)"))+";";
+    h+="border:"+(sd||act?"2px solid "+r.ac:"1.5px solid var(--b2)")+";";
+    h+="transition:all .2s'>";
+    h+="<span style='font-size:15px;font-weight:700;color:"+(sd?"#000":(act?r.ac:"var(--t3)"))+";letter-spacing:-.3px'>"+(sd?"✓":(i+1))+"</span></div>";
+  }
+  h+="</div>";
+
+  /* 메인 버튼 */
+  var dis=(rv>0);
+  h+="<button id='mb' onclick='doSet()' style='display:block;width:100%;padding:16px;border:none;border-radius:14px;font-size:15px;font-weight:600;letter-spacing:.2px;margin-bottom:16px;cursor:"+(dis?"not-allowed":"pointer")+";";
+  h+="background:"+(dis?"var(--c3)":"var(--red)")+";color:"+(dis?"var(--t3)":"#fff")+"'>";
+  h+=(dis?"↺  REST "+fmt(rv):"✓  세트 완료");
+  h+="</button>";
+
+  /* 큐 */
+  h+="<div class='cd' style='padding:16px;margin-bottom:16px'>";
+  h+="<p class='mono' style='font-size:9px;letter-spacing:1px;color:var(--t3);margin-bottom:11px'>QUEUE — 탭하면 이동</p>";
+  for(var i=0;i<r.ex.length;i++){
+    var e=r.ex[i];
+    var allD=true;for(var ss=1;ss<=e.s;ss++){if(!s.done[i+":"+ss]){allD=false;break;}}
+    var cur=(i===s.xi);
+    h+="<div onclick='jump("+i+")' style='display:flex;align-items:center;gap:10px;padding:10px;border-radius:11px;margin-bottom:3px;cursor:pointer;";
+    h+="background:"+(cur?r.ac+"0e":"transparent")+";border:1px solid "+(cur?r.ac+"22":"transparent")+";";
+    h+="opacity:"+(allD?.3:1)+";transition:all .15s'>";
+    h+="<div style='width:26px;height:26px;border-radius:7px;flex-shrink:0;background:"+(cur?r.ac+"20":"var(--c3)")+";display:flex;align-items:center;justify-content:center'>";
+    h+="<span style='font-size:10px;font-weight:700;color:"+(cur?r.ac:"var(--t3)")+"'>"+(allD?"✓":(i+1))+"</span></div>";
+    h+="<p style='flex:1;font-size:13px;font-weight:"+(cur?"600":"400")+";text-decoration:"+(allD?"line-through":"none")+";color:"+(allD?"var(--t3)":(cur?"var(--t1)":"var(--t2)"))+"'>"+e.nm+"</p>";
+    h+="<p class='mono' style='font-size:9px;color:var(--t3);flex-shrink:0'>"+e.s+"×"+(e.mx?"max":e.r)+"</p>";
+    if(cur){h+="<div style='width:6px;height:6px;border-radius:50%;background:"+r.ac+";animation:blink 1.5s infinite;flex-shrink:0'></div>";}
+    h+="</div>";
+  }
+  h+="</div></div>";
+
+  p.innerHTML=h;
+  if(rv>0)runRest();
+  return p;
+}
+
+/* 타이머 */
+function runRest(){
+  var s=G.ses;if(s.ri)clearInterval(s.ri);
+  s.ri=setInterval(function(){
+    if(s.rest<=0){clearInterval(s.ri);s.ri=null;updRest(0);beep(900,.18,.5);return;}
+    s.rest--;
+    if(s.rest<=10)beep(880,.07,.25);
+    if(s.rest===0){clearInterval(s.ri);s.ri=null;setTimeout(function(){beep(900,.18,.5);},150);}
+    updRest(s.rest);
+  },1000);
+}
+function updRest(rv){
+  var ban=document.getElementById("rb");
+  var val=document.getElementById("rv");
+  var lbl=document.getElementById("rl");
+  var btn=document.getElementById("mb");
+  if(!ban)return;
+  if(rv<=0){
+    ban.style.display="none";
+    if(btn){btn.style.background="var(--red)";btn.style.color="#fff";btn.style.cursor="pointer";btn.textContent="✓  세트 완료";}
+  } else {
+    ban.style.display="flex";
+    ban.style.background=rv<=10?"rgba(255,56,96,.14)":"rgba(255,56,96,.08)";
+    ban.style.borderColor=rv<=10?"rgba(255,56,96,.55)":"rgba(255,56,96,.2)";
+    if(val)val.textContent=fmt(rv);
+    if(lbl){lbl.textContent=rv<=10?"⚡ GO SOON":"REST";lbl.style.animation=rv<=10?"blink .7s infinite":"";}
+    if(btn){btn.style.background="var(--c3)";btn.style.color="var(--t3)";btn.style.cursor="not-allowed";btn.textContent="↺  REST "+fmt(rv);}
+  }
+}
+function skipRest(){var s=G.ses;if(s.ri){clearInterval(s.ri);s.ri=null;}s.rest=0;updRest(0);}
+
+function doSet(){
+  var s=G.ses;var r=s.r;if(s.rest>0)return;
+  var ex=r.ex[s.xi];
+  s.done[s.xi+":"+s.sn]=true;
+  if(s.sn<ex.s){
+    s.sn++;s.rest=ex.rest;saveSes();draw();runRest();
+  } else if(s.xi<r.ex.length-1){
+    s.xi++;s.sn=1;s.rest=120;saveSes();draw();runRest();
+  } else {
+    clearInterval(s.ei);if(s.ri)clearInterval(s.ri);s.fin=true;
+    localStorage.removeItem(SK_SES);
+    var ts=0;for(var i=0;i<r.ex.length;i++)ts+=r.ex[i].s;
+    G.hist.push({rid:r.id,date:new Date().toISOString(),duration:fmt(s.el),totalSets:ts,elapsed:s.el});
+    sh(G.hist);G.ct=ctMap();draw();
+  }
+}
+
+function jump(i){
+  var s=G.ses;var r=s.r;if(i===s.xi)return;
+  if(s.ri){clearInterval(s.ri);s.ri=null;}
+  var ns=1;
+  for(var ss=r.ex[i].s;ss>=1;ss--){if(s.done[i+":"+ss]){ns=(ss<r.ex[i].s?ss+1:ss);break;}}
+  s.xi=i;s.sn=ns;
+  s.rest=120;
+  saveSes();draw();runRest();
+}
+
+function askExit(){
+  var ov=document.createElement("div");ov.id="exitModal";ov.className="ov";
+  ov.addEventListener("click",function(e){if(e.target===ov)rmModal("exitModal");});
+  ov.innerHTML="<div class='sh'>"
+    +"<div style='width:36px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 20px'></div>"
+    +"<div style='text-align:center;margin-bottom:22px'>"
+    +"<div style='width:50px;height:50px;background:rgba(255,56,96,.1);border:1.5px solid rgba(255,56,96,.22);border-radius:15px;display:flex;align-items:center;justify-content:center;margin:0 auto 13px'>"
+    +"<svg width='22' height='22' viewBox='0 0 24 24' fill='none' stroke='var(--red)' stroke-width='2.2' stroke-linecap='round'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg></div>"
+    +"<p style='font-size:19px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px'>운동을 종료할까요?</p>"
+    +"<p style='font-size:13px;color:var(--t2)'>현재 진행 내용은 저장되지 않아요</p></div>"
+    +"<button class='bp' onclick='doExit()' style='margin-bottom:10px'>종료하기</button>"
+    +"<button class='bg' onclick='rmModal(\"exitModal\")'>계속 운동하기</button>"
+    +"</div>";
+  document.body.appendChild(ov);
+}
+function doExit(){
+  rmModal("exitModal");
+  var s=G.ses;if(s){if(s.ei)clearInterval(s.ei);if(s.ri)clearInterval(s.ri);}
+  G.ses=null;
+  localStorage.removeItem(SK_SES);
+  var tb=document.getElementById("tab");if(tb)tb.style.display="flex";
+  G.tab=0;G.view="home";setTab(0);draw();
+}
+function rmModal(id){var m=document.getElementById(id);if(m)m.remove();}
+
+/* ── 기록 ─────────────────────────── */
+function pHistory(){
+  var p=document.createElement("div");p.className="up";
+  var safe="calc(env(safe-area-inset-top,0px) + 22px)";
+  var total=G.hist.length;
+  var tt=0;for(var i=0;i<G.hist.length;i++)tt+=(G.hist[i].elapsed||0);
+  var h="<div style='padding:"+safe+" 20px 20px'>";
+  h+="<h1 style='font-size:28px;font-weight:700;letter-spacing:-.3px;margin-bottom:3px'>기록</h1>";
+  h+="<p class='mono' style='font-size:9px;color:var(--t3);margin-bottom:22px'>총 "+total+"회 · 누적 "+fmt(tt)+"</p>";
+  /* 루틴별 */
+  h+="<div style='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:22px'>";
+  for(var i=0;i<RD.length;i++){
+    var r=RD[i];var ct=G.ct[r.id]||0;
+    h+="<div class='cd' style='padding:14px;border-left:2.5px solid "+(ct>0?r.ac:"var(--b2)")+"'>";
+    h+="<p style='font-size:12px;font-weight:600;color:"+(ct>0?r.ac:"var(--t3)")+";margin-bottom:5px'>"+r.day+" · "+r.name+"</p>";
+    h+="<p style='font-size:24px;font-weight:700;line-height:1;color:"+(ct>0?"var(--t1)":"var(--t3)")+"'>"+ct+"<span style='font-size:13px;opacity:.5'>회</span></p>";
+    h+="</div>";
+  }
+  h+="</div>";
+  if(total===0){
+    h+="<div style='text-align:center;padding:56px 20px'>";
+    h+="<p style='font-size:42px;margin-bottom:13px'>📭</p>";
+    h+="<p style='font-size:18px;font-weight:600;color:var(--t2)'>아직 기록이 없어요</p>";
+    h+="<p style='font-size:13px;color:var(--t3);margin-top:5px'>첫 운동을 시작해보세요</p></div>";
+  } else {
+    /* 날짜별 */
+    var gd={};
+    for(var i=G.hist.length-1;i>=0;i--){
+      var l=G.hist[i];
+      var k=new Date(l.date).toLocaleDateString("ko-KR",{month:"long",day:"numeric",weekday:"short"});
+      if(!gd[k])gd[k]=[];gd[k].push(l);
+    }
+    for(var k in gd){
+      h+="<div style='margin-bottom:18px'>";
+      h+="<p class='mono' style='font-size:9px;color:var(--t3);letter-spacing:1px;margin-bottom:9px'>"+k+"</p>";
+      for(var j=0;j<gd[k].length;j++){
+        var l=gd[k][j];var r=null;
+        for(var ri=0;ri<RD.length;ri++){if(RD[ri].id===l.rid){r=RD[ri];break;}}
+        h+="<div class='cd' style='padding:13px 15px;margin-bottom:7px;display:flex;align-items:center;gap:12px;border-left:2.5px solid "+(r?r.ac:"var(--b2)")+"'>";
+        if(r){
+          h+="<div style='width:38px;height:38px;background:"+r.ac+"12;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0'>";
+          h+="<p style='font-size:16px;font-weight:700;color:"+r.ac+"'>"+r.day+"</p></div>";
+        }
+        h+="<div style='flex:1'>";
+        h+="<p style='font-size:14px;font-weight:500;margin-bottom:2px'>"+(r?r.name:l.rid)+"</p>";
+        h+="<p class='mono' style='font-size:9px;color:var(--t3)'>"+l.duration+" · "+l.totalSets+"세트</p></div>";
+        h+="<p class='mono' style='font-size:10px;color:var(--t3)'>"+new Date(l.date).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})+"</p>";
+        h+="</div>";
+      }
+      h+="</div>";
+    }
+    h+="<div style='padding:4px 0 48px'>";
+    h+="<button onclick='askClear()' style='display:block;width:100%;padding:13px;background:rgba(255,56,96,.06);border:1.5px solid rgba(255,56,96,.18);border-radius:13px;color:rgba(255,107,136,.7);font-size:14px;font-weight:500;cursor:pointer;text-align:center'>기록 전체 삭제</button>";
+    h+="</div>";
+  }
+  h+="</div>";
+  p.innerHTML=h;return p;
+}
+
+function askClear(){
+  var ov=document.createElement("div");ov.id="clrModal";ov.className="ov";
+  ov.addEventListener("click",function(e){if(e.target===ov)rmModal("clrModal");});
+  ov.innerHTML="<div class='sh'>"
+    +"<div style='width:36px;height:4px;background:var(--b2);border-radius:2px;margin:0 auto 20px'></div>"
+    +"<div style='text-align:center;margin-bottom:22px'>"
+    +"<p style='font-size:19px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px'>기록을 삭제할까요?</p>"
+    +"<p style='font-size:13px;color:var(--t2)'>삭제 후 복구할 수 없어요</p></div>"
+    +"<button class='bp' onclick='doClear()' style='margin-bottom:10px'>전체 삭제</button>"
+    +"<button class='bg' onclick='rmModal(\"clrModal\")'>취소</button>"
+    +"</div>";
+  document.body.appendChild(ov);
+}
+function doClear(){rmModal("clrModal");G.hist=[];sh([]);G.ct={};draw();}
+
+function adjKg(d){
+  var s=G.ses;var ex=s.r.ex[s.xi];
+  if(ex.kg===0)return;
+  var step=ex.db?2:(ex.sl?2.5:5);
+  var maxKg=ex.db?32:999;
+  var nv=ex.kg+d;
+  if(nv<0)nv=0;
+  if(nv>maxKg)nv=maxKg;
+  ex.kg=nv;
+  var el=document.getElementById("kgCount");
+  if(el)el.textContent=nv;
+  saveKg();
+}
+
+function adjSets(d){
+  var s=G.ses;var ex=s.r.ex[s.xi];
+  var nv=ex.s+d;
+  if(nv<1||nv>10)return;
+  ex.s=nv;
+  /* 현재 세트번호가 새 총세트 초과하면 조정 */
+  if(s.sn>nv)s.sn=nv;
+  var el=document.getElementById("setCount");
+  if(el)el.textContent=nv;
+  /* SET 표시 업데이트 */
+  var setDisp=document.querySelectorAll("[id^='setDisp']");
+  /* 도트 영역 다시 그리기 */
+  var dotWrap=document.getElementById("dotWrap");
+  if(dotWrap){
+    var r=s.r;var ac=r.ac;
+    var dots="";
+    for(var i=0;i<nv;i++){
+      var sd=s.done[s.xi+":"+(i+1)];var act=(i+1===s.sn);
+      dots+="<div style='flex:1;max-width:54px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;";
+      dots+="background:"+(sd?ac:(act?ac+"1a":"var(--c2)"))+";";
+      dots+="border:"+(sd||act?"2px solid "+ac:"1.5px solid var(--b2)")+";transition:all .2s'>";
+      dots+="<span style='font-size:15px;font-weight:700;color:"+(sd?"#000":(act?ac:"var(--t3)"))+";letter-spacing:-.3px'>"+(sd?"✓":(i+1))+"</span></div>";
+    }
+    dotWrap.innerHTML=dots;
+  }
+  /* 남은 세트 표시 업데이트 */
+  var remEl=document.getElementById("remSets");
+  if(remEl)remEl.textContent=(nv-s.sn+1)+"세트";
+}
+
+function adjReps(d){
+  var s=G.ses;var ex=s.r.ex[s.xi];
+  if(ex.mx)return;
+  var nv=ex.r+d;
+  if(nv<1||nv>50)return;
+  ex.r=nv;
+  var el=document.getElementById("repCount");
+  if(el)el.textContent=nv;
+  /* 목표 표시 업데이트 */
+  var tgtEl=document.getElementById("tgtReps");
+  if(tgtEl)tgtEl.textContent=nv+"회";
+}
+
+function adjRest(d){
+  var s=G.ses;var ex=s.r.ex[s.xi];
+  var nv=ex.rest+d;
+  if(nv<0)nv=0;
+  if(nv>300)nv=300;
+  ex.rest=nv;
+  var el=document.getElementById("restCount");
+  if(el)el.textContent=nv;
+  /* RD 원본에도 반영하여 다음 세션에서도 유지 */
+  for(var i=0;i<RD.length;i++){
+    if(RD[i].id===s.r.id){
+      RD[i].ex[s.xi].rest=nv;
+      break;
+    }
+  }
+  saveKg(); /* kg 저장과 동일한 스토리지 패턴으로 rest도 저장 */
+  saveRest();
+}
+
+var SK_REST="lift5_rest";
+function saveRest(){
+  try{
+    var m={};
+    for(var i=0;i<RD.length;i++){
+      var r=RD[i];
+      for(var j=0;j<r.ex.length;j++){
+        m[r.id+":"+j]=r.ex[j].rest;
+      }
+    }
+    localStorage.setItem(SK_REST,JSON.stringify(m));
+  }catch(e){}
+}
+function loadRest(){
+  try{
+    var m=JSON.parse(localStorage.getItem(SK_REST)||"null");
+    if(!m)return;
+    for(var i=0;i<RD.length;i++){
+      var r=RD[i];
+      for(var j=0;j<r.ex.length;j++){
+        var v=m[r.id+":"+j];
+        if(v!==undefined)r.ex[j].rest=v;
+      }
+    }
+  }catch(e){}
+}
+
+/* ── 전역 핸들러 ─────────────────── */
+function goDetail(i){G.sel=RD[i];G.view="detail";draw();}
+function back(){G.view=(G.tab===0?"home":G.tab===1?"routines":"history");draw();}
+function goHome(){G.ses=null;var tb=document.getElementById("tab");if(tb)tb.style.display="flex";G.tab=0;G.view="home";setTab(0);draw();}
+
+/* ── 초기화 ──────────────────────── */
+function initApp(){
+  loadKg();
+  loadRest();
+  var saved=loadSes();
+  if(saved){
+    G.ses=saved;
+    G.view="session";
+    var tb=document.getElementById("tab");
+    if(tb)tb.style.display="none";
+    draw();
+    if(G.ses.rest>0)runRest();
+  } else {
+    setTab(0);draw();
+  }
+}
+window.onload=function(){initApp();};
+
+/* pageshow: 안드로이드 앱 전환 후 복귀 시 BFCache에서 복원될 때도 실행 */
+window.addEventListener("pageshow",function(e){
+  if(e.persisted){
+    /* BFCache 복원 — 상태 재초기화 */
+    G.ses=null;
+    initApp();
+  }
+});
+
+var _hiddenAt=0;
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden){
+    _hiddenAt=Date.now();
+    saveSes();saveKg();saveRest();
+  } else {
+    /* visibilitychange로 돌아온 경우 (페이지 reload 없이) */
+    if(G.ses&&!G.ses.fin&&G.view==="session"){
+      if(_hiddenAt>0){
+        var away=Math.floor((Date.now()-_hiddenAt)/1000);
+        G.ses.el+=away;
+        if(G.ses.rest>0)G.ses.rest=Math.max(0,G.ses.rest-away);
+        _hiddenAt=0;
+      }
+      if(G.ses.rest>0){if(!G.ses.ri)runRest();}
+      var et=document.getElementById("et");
+      if(et)et.textContent=fmt(G.ses.el);
+    } else if(!G.ses){
+      /* 세션 없을 때 돌아온 경우 — localStorage 재확인 */
+      var saved=loadSes();
+      if(saved){
+        G.ses=saved;G.view="session";
+        var tb=document.getElementById("tab");
+        if(tb)tb.style.display="none";
+        draw();
+        if(G.ses.rest>0)runRest();
+      }
+    }
+  }
+});
+window.addEventListener("pagehide",function(){saveSes();saveKg();saveRest();});
+window.addEventListener("beforeunload",function(){saveSes();saveKg();saveRest();});
+
+/* ── PWA 서비스 워커 등록 ─────────── */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(e){});
+  });
+}
+</script>
+</body>
+</html>
